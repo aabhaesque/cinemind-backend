@@ -1,0 +1,171 @@
+# ------------------------------------------------------------
+#  CineMind – Visual Narrative Generator (Backend Demonstration)
+#  DES646: AI/ML for Designers
+#  Author: <YOUR NAME>
+#
+#  Description:
+#  This Python script demonstrates the intended backend logic
+#  of the CineMind prototype. It simulates the processing pipeline:
+#
+#   1. Accept one-line story prompt
+#   2. Extract emotional tone + key elements (mock NLP)
+#   3. Expand into cinematic AI prompts
+#   4. Send expanded prompts to Stable Diffusion API
+#   5. Save 4–6 generated cinematic frames
+#
+#  Note:
+#  This is a conceptual demonstration, matching the Figma prototype.
+#  It is not a full deployment of the system.
+# ------------------------------------------------------------
+
+import requests
+import base64
+import os
+
+# ------------------------------------------------------------
+# 1. Simple NLP Interpretation (Simulated)
+# ------------------------------------------------------------
+
+def analyze_prompt(story_prompt):
+    """
+    Simulates NLP tone + context extraction.
+    In a real system, this would use spaCy or transformers.
+
+    Returns a dict of detected attributes.
+    """
+
+    story_prompt = story_prompt.lower()
+
+    tones = []
+    if any(word in story_prompt for word in ["lonely", "alone", "isolated"]):
+        tones.append("solitude")
+    if any(word in story_prompt for word in ["dawn", "morning", "sunrise"]):
+        tones.append("dawn light")
+    if any(word in story_prompt for word in ["night", "dark"]):
+        tones.append("low light")
+
+    settings = []
+    if "metro" in story_prompt:
+        settings.append("metro station")
+        settings.append("train interior")
+
+    return {
+        "tones": tones,
+        "settings": settings
+    }
+
+# ------------------------------------------------------------
+# 2. Convert NLP result into cinematic diffusion prompts
+# ------------------------------------------------------------
+
+def create_cinematic_prompts(story_prompt, analysis):
+    """
+    Expands the story into 4–6 cinematic prompts.
+    """
+
+    base = story_prompt
+
+    cinematic_templates = [
+        "wide-angle shot, moody lighting, {} , {} , cinematic film grain",
+        "close-up emotional shot, reflections, {} , soft light, {}",
+        "establishing shot, atmospheric haze, {} , {} , dramatic shadows",
+        "mid-shot, moving train, motion blur, {} , {} , melancholic tone",
+        "over-the-shoulder shot, window reflections, {} , {} , cool tones"
+    ]
+
+    prompts = []
+    for template in cinematic_templates:
+        enriched = template.format(
+            analysis["tones"][0] if analysis["tones"] else "emotional tone",
+            analysis["settings"][0] if analysis["settings"] else "urban environment"
+        )
+        # Combine base story + cinematic interpretation
+        final_prompt = f"{base}. {enriched}."
+        prompts.append(final_prompt)
+
+    return prompts[:5]  # Return 5 frames to match report
+
+
+# ------------------------------------------------------------
+# 3. Stable Diffusion API Call
+# ------------------------------------------------------------
+
+API_KEY = "YOUR_STABILITY_API_KEY"  # Replace or leave blank for submission
+API_URL = "https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image"
+
+def generate_image(prompt, outfile):
+    """
+    Sends a single cinematic prompt to Stable Diffusion API.
+    """
+
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Bearer {API_KEY}"
+    }
+
+    body = {
+        "text_prompts": [{"text": prompt}],
+        "samples": 1,
+        "steps": 30,
+        "cfg_scale": 7,
+        "width": 1024,
+        "height": 576  # cinematic aspect
+    }
+
+    response = requests.post(API_URL, headers=headers, json=body)
+
+    if response.status_code != 200:
+        raise Exception("API error: " + response.text)
+
+    data = response.json()
+
+    # Extract base64 image
+    image_base64 = data["artifacts"][0]["base64"]
+    image_bytes = base64.b64decode(image_base64)
+
+    with open(outfile, "wb") as f:
+        f.write(image_bytes)
+
+    print(f"[OK] Saved frame: {outfile}")
+
+
+# ------------------------------------------------------------
+# 4. Full Pipeline
+# ------------------------------------------------------------
+
+def cinemind_generate(story_prompt):
+    """
+    Full backend simulation pipeline for CineMind.
+    """
+
+    print("\n--- CineMind Backend Demonstration ---")
+    print("Input Story:", story_prompt)
+
+    # Step 1: NLP interpretation
+    analysis = analyze_prompt(story_prompt)
+    print("\nDetected Tone:", analysis["tones"])
+    print("Detected Settings:", analysis["settings"])
+
+    # Step 2: Create cinematic prompts
+    prompts = create_cinematic_prompts(story_prompt, analysis)
+    print("\nGenerated Cinematic Prompts:")
+    for p in prompts:
+        print("-", p)
+
+    # Step 3: Generate frames
+    os.makedirs("cinemind_outputs", exist_ok=True)
+    for i, prompt in enumerate(prompts):
+        outfile = f"cinemind_outputs/frame_{i+1}.png"
+        generate_image(prompt, outfile)
+
+    print("\nCineMind generation complete.")
+
+
+# ------------------------------------------------------------
+# 5. Example Run
+# ------------------------------------------------------------
+
+if _name_ == "_main_":
+    test_prompt = "A lonely man rides the metro at dawn"
+    cinemind_generate(test_prompt)
